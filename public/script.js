@@ -15,7 +15,6 @@ document.getElementById("generate-btn").addEventListener("click", async () => {
   ).innerHTML = `<p>Generating roadmap for: <strong>${goal}</strong>...</p>`;
 
   try {
-    // 🔑 Call your Vercel serverless function (no API key in browser)
     const response = await fetch("/api/generate-roadmap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,7 +60,7 @@ document.getElementById("generate-btn").addEventListener("click", async () => {
   }
 });
 
-// ⬅️ Back button – reset everything
+// Back button – reset everything
 document.getElementById("back-btn").addEventListener("click", () => {
   leaderLines.forEach((line) => line.remove());
   leaderLines = [];
