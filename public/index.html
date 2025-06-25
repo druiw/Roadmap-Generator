@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoadMap.io</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leader-line/1.0.7/leader-line.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="home-screen">
+      <h1>What do you want to learn?</h1>
+      <input
+        type="text"
+        id="goal-input"
+        placeholder="Learn frontend development"
+      />
+      <button id="generate-btn">Generate Roadmap</button>
+    </div>
+
+    <div id="roadmap-screen" style="display: none">
+      <button id="back-btn">Home</button>
+      <h2>Your Roadmap</h2>
+      <div id="container"></div>
+      <svg id="line-layer"></svg>
+    </div>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>
