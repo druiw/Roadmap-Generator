@@ -13,7 +13,48 @@ const DX = 210; // horizontal spacing between sibling subtrees
 const DY = 140; // vertical spacing between tree levels
 const PADDING = 60;
 
-const treeLayout = d3.tree().nodeSize([DX, DY]);
+const treeLayout = d3
+  .tree()
+  .nodeSize([DX, DY])
+  .separation((a, b) => (a.parent === b.parent ? 1 : 1.25));
+
+// Dev-only: open the page with ?mock to preview the tree layout with sample
+// data (e.g. via Live Server), without hitting the API. Remove when no longer
+// needed.
+const USE_MOCK = new URLSearchParams(location.search).has("mock");
+const MOCK_TREE = {
+  label: "Learn frontend development",
+  children: [
+    {
+      label: "HTML Basics",
+      children: [
+        { label: "Document structure" },
+        { label: "Forms & inputs" },
+        { label: "Semantic tags" },
+      ],
+    },
+    {
+      label: "CSS Fundamentals",
+      children: [
+        { label: "Box model" },
+        { label: "Flexbox & Grid" },
+        { label: "Responsive design" },
+      ],
+    },
+    {
+      label: "JavaScript",
+      children: [
+        { label: "Syntax & types" },
+        { label: "DOM manipulation" },
+        { label: "Fetch & async" },
+      ],
+    },
+    {
+      label: "Build a project",
+      children: [{ label: "Deploy to Vercel" }],
+    },
+  ],
+};
 
 let root = null; // current d3.hierarchy root
 let leaderLines = [];
@@ -144,14 +185,19 @@ async function generateRoadmap() {
   canvas.innerHTML = `<p class="loading">Generating roadmap for "${goal}"…</p>`;
 
   try {
-    const response = await fetch("/api/generate-roadmap", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goal }),
-    });
-    if (!response.ok) throw new Error(await response.text());
+    let tree;
+    if (USE_MOCK) {
+      tree = MOCK_TREE;
+    } else {
+      const response = await fetch("/api/generate-roadmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      ({ tree } = await response.json());
+    }
 
-    const { tree } = await response.json();
     if (!tree || typeof tree.label !== "string") {
       throw new Error("Empty roadmap");
     }
