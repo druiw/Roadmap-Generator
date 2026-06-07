@@ -19,22 +19,41 @@ export default async function handler(req, res) {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      temperature: 0.7,
+      max_tokens: 1000,
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
           content:
-            "You are a helpful assistant that creates simple, step-by-step learning roadmaps.",
+            "You design branching learning roadmaps shaped like a tree. " +
+            "Respond ONLY with JSON matching this shape: " +
+            '{ "label": string, "children": [ { "label": string, "children": [...] } ] }. ' +
+            "The root label is the overall goal. Provide 3-5 top-level branches " +
+            "(major areas), each with 2-4 child steps, and optionally one more level " +
+            "of detail where it helps. Keep every label short (max ~8 words). " +
+            "Maximum depth is 3 levels below the root. Leaf nodes may omit children.",
         },
         {
           role: "user",
-          content: `Create a roadmap for this goal: "${goal.trim()}". Give it as a numbered list of short steps.`,
+          content: `Create a branching roadmap (as JSON) for this goal: "${goal.trim()}".`,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 700,
     });
 
-    res.status(200).json({ roadmap: completion.choices[0].message.content });
+    const raw = completion.choices[0].message.content;
+    let tree;
+    try {
+      tree = JSON.parse(raw);
+    } catch {
+      return res.status(502).json({ error: "Model returned invalid JSON" });
+    }
+
+    if (!tree || typeof tree.label !== "string") {
+      return res.status(502).json({ error: "Model returned an unexpected shape" });
+    }
+
+    res.status(200).json({ tree });
   } catch (err) {
     console.error("OpenAI request failed:", err);
     res.status(500).json({ error: "Failed to generate roadmap" });
