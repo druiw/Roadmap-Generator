@@ -56,13 +56,9 @@ const MOCK_TREE = {
   ],
 };
 
-let root = null; // current d3.hierarchy root
-let leaderLines = [];
+const SVG_NS = "http://www.w3.org/2000/svg";
 
-function clearLines() {
-  leaderLines.forEach((line) => line.remove());
-  leaderLines = [];
-}
+let root = null; // current d3.hierarchy root
 
 // Collapse/expand a node by swapping its children in and out of view.
 function toggleCollapse(node) {
@@ -76,9 +72,15 @@ function toggleCollapse(node) {
   render();
 }
 
+// The natural-size tree (nodes + connectors). Kept around so a resize can
+// re-fit it to the viewport without rebuilding the whole layout.
+let treeInner = null;
+let naturalWidth = 0;
+let naturalHeight = 0;
+
 function render() {
-  clearLines();
   canvas.innerHTML = "";
+  treeInner = null;
   if (!root) return;
 
   treeLayout(root);
@@ -94,9 +96,18 @@ function render() {
     maxY = Math.max(maxY, n.y);
   }
   const offsetX = PADDING + NODE_W / 2 - minX;
+  naturalWidth = maxX - minX + NODE_W + PADDING * 2;
 
-  canvas.style.width = maxX - minX + NODE_W + PADDING * 2 + "px";
-  canvas.style.height = maxY + NODE_H + PADDING * 2 + "px";
+  // Build the tree at its natural size, then scale it to fit the viewport.
+  treeInner = document.createElement("div");
+  treeInner.className = "tree-inner";
+  treeInner.style.width = naturalWidth + "px";
+
+  // SVG connectors sit behind the nodes in the same coordinate space.
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "links");
+  svg.setAttribute("width", naturalWidth);
+  treeInner.appendChild(svg);
 
   const elFor = new Map();
 
@@ -134,37 +145,64 @@ function render() {
       el.appendChild(caret);
     }
 
-    canvas.appendChild(el);
+    treeInner.appendChild(el);
     elFor.set(n, el);
   }
 
+  canvas.appendChild(treeInner);
+
+  // Now that nodes are in the DOM we can measure their real (wrapped) heights
+  // to place connectors and size the canvas.
+  let maxBottom = 0;
+  for (const n of nodes) {
+    const top = n.y + PADDING;
+    maxBottom = Math.max(maxBottom, top + elFor.get(n).offsetHeight);
+  }
+  naturalHeight = maxBottom + PADDING;
+  treeInner.style.height = naturalHeight + "px";
+  svg.setAttribute("height", naturalHeight);
+
   // Connect each node to its parent (inverted tree: top -> bottom).
   for (const n of nodes) {
-    if (n.parent) {
-      const line = new LeaderLine(elFor.get(n.parent), elFor.get(n), {
-        color: "#6c8cff",
-        size: 2,
-        path: "fluid",
-        startSocket: "bottom",
-        endSocket: "top",
-        startPlug: "behind",
-        endPlug: "arrow1",
-        endPlugSize: 1.5,
-      });
-      leaderLines.push(line);
-    }
+    if (!n.parent) continue;
+    const p = n.parent;
+    const sx = p.x + offsetX;
+    const sy = p.y + PADDING + elFor.get(p).offsetHeight; // parent bottom-center
+    const ex = n.x + offsetX;
+    const ey = n.y + PADDING; // child top-center
+    const my = (sy + ey) / 2; // midpoint for a smooth vertical curve
+
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute(
+      "d",
+      `M ${sx} ${sy} C ${sx} ${my}, ${ex} ${my}, ${ex} ${ey}`
+    );
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#6c8cff");
+    path.setAttribute("stroke-width", "2");
+    svg.appendChild(path);
   }
 
-  // Center the view on the tree if it's wider than the screen.
-  requestAnimationFrame(() => {
-    const extra = canvas.offsetWidth - window.innerWidth;
-    if (extra > 0) window.scrollTo({ left: extra / 2 });
-  });
+  fitToViewport();
 }
 
-// Keep connector lines aligned when the window is resized.
+// Scale the tree so its full width fits the viewport (vertical scroll only).
+function fitToViewport() {
+  if (!treeInner || !naturalWidth) return;
+  const available = canvas.clientWidth;
+  const scale = Math.min(1, available / naturalWidth);
+  treeInner.style.transform = `scale(${scale})`;
+  // Center the scaled tree horizontally within the viewport.
+  treeInner.style.left = Math.max(0, (available - naturalWidth * scale) / 2) + "px";
+  // Reserve the scaled height on the page so the wrapper scrolls correctly.
+  canvas.style.height = naturalHeight * scale + "px";
+}
+
+// Re-fit the tree to the viewport on resize / orientation change.
+let resizeRaf = null;
 window.addEventListener("resize", () => {
-  leaderLines.forEach((line) => line.position());
+  if (resizeRaf) cancelAnimationFrame(resizeRaf);
+  resizeRaf = requestAnimationFrame(fitToViewport);
 });
 
 async function generateRoadmap() {
@@ -179,8 +217,8 @@ async function generateRoadmap() {
 
   homeScreen.style.display = "none";
   roadmapScreen.style.display = "block";
-  clearLines();
   root = null;
+  treeInner = null;
   canvas.removeAttribute("style");
   canvas.innerHTML = `<p class="loading">Generating roadmap for "${goal}"…</p>`;
 
@@ -219,8 +257,8 @@ goalInput.addEventListener("keydown", (e) => {
 });
 
 backBtn.addEventListener("click", () => {
-  clearLines();
   root = null;
+  treeInner = null;
   canvas.innerHTML = "";
   canvas.removeAttribute("style");
   roadmapScreen.style.display = "none";

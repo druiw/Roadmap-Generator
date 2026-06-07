@@ -12,6 +12,13 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  /* Lock the page to vertical scrolling only. */
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -84,13 +91,31 @@ button:disabled {
 
 #viewport {
   width: 100%;
-  overflow: visible;
+  overflow: hidden;
 }
 
+/* Scaling wrapper: full width, its height is set in JS to the scaled tree
+   height so the page only scrolls vertically. */
 #canvas {
   position: relative;
-  display: block;
-  margin: 0 auto;
+  width: 100%;
+}
+
+/* Natural-size tree (nodes + svg connectors). Scaled down via transform to
+   fit the viewport width; centered horizontally (left set in JS). */
+.tree-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: top left;
+}
+
+.tree-inner svg.links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
 }
 
 .node {
