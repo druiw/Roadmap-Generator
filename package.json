@@ -1,6 +1,14 @@
 {
+  "name": "roadmap-app",
+  "version": "1.0.0",
+  "description": "Generate step-by-step learning roadmaps with AI.",
   "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy"
+  },
   "dependencies": {
-    "openai": "^4.0.0"
+    "openai": "^5.7.0"
   }
 }

@@ -1,18 +1,54 @@
+const goalInput = document.getElementById("goal-input");
+const generateBtn = document.getElementById("generate-btn");
+const errorMsg = document.getElementById("error-msg");
+const container = document.getElementById("container");
+const homeScreen = document.getElementById("home-screen");
+const roadmapScreen = document.getElementById("roadmap-screen");
+const backBtn = document.getElementById("back-btn");
+
 let leaderLines = [];
 
-document.getElementById("generate-btn").addEventListener("click", async () => {
-  const goal = document.getElementById("goal-input").value.trim();
+function clearLines() {
+  leaderLines.forEach((line) => line.remove());
+  leaderLines = [];
+}
+
+function drawLines() {
+  clearLines();
+  const nodes = container.querySelectorAll(".node");
+  nodes.forEach((node, idx) => {
+    if (idx < nodes.length - 1) {
+      const line = new LeaderLine(node, nodes[idx + 1], {
+        color: "#6c8cff",
+        size: 2,
+        path: "straight",
+        startPlug: "behind",
+        endPlug: "arrow1",
+      });
+      leaderLines.push(line);
+    }
+  });
+}
+
+// Keep the connector lines aligned when the window is resized.
+window.addEventListener("resize", () => {
+  if (leaderLines.length) drawLines();
+});
+
+async function generateRoadmap() {
+  const goal = goalInput.value.trim();
+  errorMsg.textContent = "";
+
   if (!goal) {
-    alert("Please enter a goal.");
+    errorMsg.textContent = "Please enter something you'd like to learn.";
+    goalInput.focus();
     return;
   }
 
-  // Swap screens + placeholder
-  document.getElementById("home-screen").style.display = "none";
-  document.getElementById("roadmap-screen").style.display = "block";
-  document.getElementById(
-    "container"
-  ).innerHTML = `<p>Generating roadmap for: <strong>${goal}</strong>...</p>`;
+  // Swap screens + show a loading placeholder.
+  homeScreen.style.display = "none";
+  roadmapScreen.style.display = "block";
+  container.innerHTML = `<p class="loading">Generating roadmap for "${goal}"…</p>`;
 
   try {
     const response = await fetch("/api/generate-roadmap", {
@@ -24,48 +60,44 @@ document.getElementById("generate-btn").addEventListener("click", async () => {
 
     const { roadmap } = await response.json();
 
-    // --- Build nodes from numbered list ---
+    // Build nodes from the numbered list returned by the model.
     const steps = roadmap.match(/\d+\..+?(?=\n\d+\.|\n*$)/gs) || [];
-    const container = document.getElementById("container");
     container.innerHTML = "";
+
+    if (steps.length === 0) {
+      container.innerHTML =
+        "<p class='loading'>No steps were returned. Try rephrasing your goal.</p>";
+      return;
+    }
 
     steps.forEach((step) => {
       const node = document.createElement("div");
       node.className = "node";
-      node.style.marginBottom = "40px";
-      node.innerText = step;
-
+      node.textContent = step.trim();
       node.addEventListener("click", () => node.classList.toggle("completed"));
       container.appendChild(node);
     });
 
-    // --- Draw LeaderLines between nodes ---
-    const nodes = document.querySelectorAll(".node");
-    nodes.forEach((node, idx) => {
-      if (idx < nodes.length - 1) {
-        const line = new LeaderLine(node, nodes[idx + 1], {
-          color: "white",
-          size: 2,
-          path: "straight",
-          startPlug: "behind",
-          endPlug: "arrow1",
-        });
-        leaderLines.push(line);
-      }
-    });
+    drawLines();
   } catch (err) {
     console.error("Error generating roadmap:", err);
-    document.getElementById("container").innerHTML =
-      "<p>Something went wrong. Please try again.</p>";
+    container.innerHTML =
+      "<p class='loading'>Something went wrong. Please go back and try again.</p>";
   }
+}
+
+generateBtn.addEventListener("click", generateRoadmap);
+
+// Let users press Enter to submit.
+goalInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") generateRoadmap();
 });
 
-// Back button – reset everything
-document.getElementById("back-btn").addEventListener("click", () => {
-  leaderLines.forEach((line) => line.remove());
-  leaderLines = [];
-
-  document.getElementById("container").innerHTML = "";
-  document.getElementById("roadmap-screen").style.display = "none";
-  document.getElementById("home-screen").style.display = "block";
+// Back button – reset everything.
+backBtn.addEventListener("click", () => {
+  clearLines();
+  container.innerHTML = "";
+  roadmapScreen.style.display = "none";
+  homeScreen.style.display = "block";
+  goalInput.focus();
 });
